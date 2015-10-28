@@ -86,7 +86,10 @@ public:
     bumper_right_pressed_(false),
     cliff_left_detected_(false),
     cliff_center_detected_(false),
-    cliff_right_detected_(false), 
+    cliff_right_detected_(false),
+//
+    cliff_top_detected_(false),
+// 
     last_event_time_(ros::Time(0)),
     msg_(new geometry_msgs::Twist()){};
   ~SafetyController(){};
@@ -125,7 +128,7 @@ private:
   ros::Publisher controller_state_publisher_, velocity_command_publisher_;
   bool wheel_left_dropped_, wheel_right_dropped_;
   bool bumper_left_pressed_, bumper_center_pressed_, bumper_right_pressed_;
-  bool cliff_left_detected_, cliff_center_detected_, cliff_right_detected_;
+  bool cliff_left_detected_, cliff_center_detected_, cliff_right_detected_, /* */ cliff_top_detected_;
   ros::Duration time_to_extend_bump_cliff_events_;
   ros::Time last_event_time_;
 
@@ -208,6 +211,7 @@ void SafetyController::cliffEventCB(const kobuki_msgs::CliffEventConstPtr msg)
       case kobuki_msgs::CliffEvent::LEFT:    cliff_left_detected_   = true;  break;
       case kobuki_msgs::CliffEvent::CENTER:  cliff_center_detected_ = true;  break;
       case kobuki_msgs::CliffEvent::RIGHT:   cliff_right_detected_  = true;  break;
+      case kobuki_msgs::CliffEvent::TOP:     cliff_top_detected_    = true;  break;
     }
   }
   else // kobuki_msgs::CliffEvent::FLOOR
@@ -218,6 +222,7 @@ void SafetyController::cliffEventCB(const kobuki_msgs::CliffEventConstPtr msg)
       case kobuki_msgs::CliffEvent::LEFT:    cliff_left_detected_   = false; break;
       case kobuki_msgs::CliffEvent::CENTER:  cliff_center_detected_ = false; break;
       case kobuki_msgs::CliffEvent::RIGHT:   cliff_right_detected_  = false; break;
+      case kobuki_msgs::CliffEvent::TOP:     cliff_top_detected_    = false; break;
     }
   }
 };
@@ -346,6 +351,18 @@ void SafetyController::spin()
       msg_->angular.z = 0.4;
       velocity_command_publisher_.publish(msg_);
     }
+   else if (cliff_top_detected_ )
+   {
+      msg_.reset(new geometry_msgs::Twist());
+      msg_->linear.x = -0.1;
+      msg_->linear.y = 0.0;
+      msg_->linear.z = 0.0;
+      msg_->angular.x = 0.0;
+      msg_->angular.y = 0.0;
+      msg_->angular.z = 0.0;
+      velocity_command_publisher_.publish(msg_);
+   }
+
     //if we want to extend the safety state and we're within the time, just keep sending msg_
     else if (time_to_extend_bump_cliff_events_ > ros::Duration(1e-10) && 
 	     ros::Time::now() - last_event_time_ < time_to_extend_bump_cliff_events_) {
